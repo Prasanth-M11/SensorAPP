@@ -1,0 +1,6 @@
+@SensorAPP_HostAddress = https://localhost:5001/swagger/index.html
+
+GET {{SensorAPP_HostAddress}}/Sensor/
+Accept: application/json
+
+###
