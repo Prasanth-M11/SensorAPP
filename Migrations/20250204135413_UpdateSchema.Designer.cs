@@ -12,8 +12,8 @@ using SensorAPP.Data;
 namespace SensorAPP.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250204065659_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20250204135413_UpdateSchema")]
+    partial class UpdateSchema
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -44,7 +44,7 @@ namespace SensorAPP.Migrations
 
                     b.HasKey("Guid");
 
-                    b.ToTable("SensorData");
+                    b.ToTable("ExistingSensorData", (string)null);
                 });
 #pragma warning restore 612, 618
         }
