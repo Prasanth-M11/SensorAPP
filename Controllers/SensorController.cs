@@ -1,9 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using System;
-using System.Collections.Generic;
-using Microsoft.Data.SqlClient;
-using System.Configuration;
+using Microsoft.Extensions.Configuration;
+using SensorAPP.Data;
 using SensorAPP.Models;
+using System;
+using System.Linq;
 
 namespace SensorAPP.Controllers
 {
@@ -11,66 +11,60 @@ namespace SensorAPP.Controllers
     [ApiController]
     public class SensorController : ControllerBase
     {
-        private static List<SensorData> sensorDataList = new List<SensorData>();
+        private readonly ApplicationDbContext _dbContext;
+
+        public SensorController(ApplicationDbContext dbContext)
+        {
+            _dbContext = dbContext;
+        }
 
         // POST: api/sensor/store
         [HttpPost("store")]
-        public IActionResult StoreSensorData([FromBody] SensorData sensor)
+        public IActionResult StoreSensorData([FromBody] SensorDataRequest sensorRequest)
         {
-            if (sensor == null)
+            if (sensorRequest == null)
                 return BadRequest("Sensor data is null");
 
-            //sensor.Timestamp = DateTime.UtcNow; // Add timestamp
-            sensorDataList.Add(sensor); // Add to in-memory list
+            var sensor = new SensorData
+            {
+                Guid = Guid.NewGuid(), // Auto-generate GUID
+                SensorType = sensorRequest.SensorType,
+                Value = sensorRequest.Value,
+                Timestamp = DateTime.UtcNow // Add timestamp automatically
+            };
 
-            bool success = SaveSensorDataToDatabase(sensor);
-            if (success)
-            {
-                return Ok("Data stored successfully");
-            }
-            else
-            {
-                return StatusCode(500, "Failed to save data to the database");
-            }
+            _dbContext.SensorData.Add(sensor);
+            _dbContext.SaveChanges(); // Save to DB
+
+            return Ok("Data stored successfully");
         }
 
         // GET: api/sensor/get
         [HttpGet("get")]
         public IActionResult GetSensorData()
         {
-            return Ok(sensorDataList); // Return the in-memory list
+            var sensorDataList = _dbContext.SensorData
+                .OrderByDescending(s => s.Timestamp) // Order by latest timestamp
+                .ToList();
+
+            if (!sensorDataList.Any())
+                return NotFound("No sensor data found.");
+
+            return Ok(sensorDataList);
         }
 
-        private bool SaveSensorDataToDatabase(SensorData sensor)
+        // GET: api/sensor/latest
+        [HttpGet("latest")]
+        public IActionResult GetLatestSensorData()
         {
-            try
-            {
-                string connectionString = System.Configuration.ConfigurationManager.ConnectionStrings["SensorDBConnectionString"].ConnectionString;
-                Console.WriteLine($"Connection String: {connectionString}");
+            var latestSensor = _dbContext.SensorData
+                .OrderByDescending(s => s.Timestamp) // Get latest entry
+                .FirstOrDefault();
 
-                using (var connection = new SqlConnection(connectionString))
-                {
-                    var command = new SqlCommand("INSERT INTO SensorData (Guid, SensorType, Value,Timestamp) VALUES (@Guid, @SensorType, @Value, @Timestamp)", connection);
-                    command.Parameters.AddWithValue("@Guid", sensor.Guid);
-                    command.Parameters.AddWithValue("@SensorType", sensor.SensorType);
-                    command.Parameters.AddWithValue("@Value", sensor.Value);
-                    command.Parameters.AddWithValue("@Timestamp", sensor.Timestamp);
+            if (latestSensor == null)
+                return NotFound("No sensor data found.");
 
-
-                    connection.Open();
-                    int rowsAffected = command.ExecuteNonQuery();
-                    return rowsAffected > 0;
-                }
-            }
-          
-            
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error: {ex.Message}");
-                throw new Exception($"Database error: {ex.Message}"); // Propagate error details
-            }
+            return Ok(latestSensor);
         }
     }
 }
-
-
